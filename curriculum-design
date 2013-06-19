@@ -1,0 +1,786 @@
+/**
+题目: 公司人事管理系统
+
+信息描述
+
+公司共有4类人员：老板、技术人员、业务人员、财务人员、文秘、业务经理、
+技术经理。现在，需要存储这些人员的姓名、编号、级别、当月薪水，计算月
+薪总额并显示全部信息,并且老板可以对各种人员进行增加、查寻、修改、删除。
+
+功能描述
+
+1)其中，人员编号在生成人员信息时同时生成，每输入一个人员信息编号顺序加1。
+2)程序对所有人员有提升级别的功能。
+3)月薪的计算方法是：经理拿固定月薪（5000元），技术人员按完成的代码
+量（1000元/每千行代码）领取月薪，业务人员的报酬按该推销员当月销售
+额(15%)与承接的项目额(10%)提成,业务经理既拿固定月薪(2000元)也领取
+提成，财务人员固定工资(2000元)，文秘为固定工资（1500元）。
+4)可按姓名显示、查找、增加、删除、修改和保存各类人员的信息。
+*/
+
+#include <iostream>   	    // 标准输入输出流头文件
+#include <fstream>				// 文件流头文件
+#include<cstdlib>	 			// 一个常用函数库的头文件
+#include <cstring>   			// 字符串头文件
+#include<windows.h>  			// 显示windows窗口头文件
+#include <iomanip>
+#include <conio.h>              //
+using namespace std; 			// 标准命名空间
+
+
+
+//全局变量
+double Manager_Money;			//经理固定月薪
+double SalesManager_Money; 		//销售经理固定月薪
+double SecretarySalary;      //文秘固定月薪
+double SalesManager_Add; 		//销售经理提成％
+double Sales_Add;			    //销售人员提成％
+double Technicist_Every_Hour;   //技术人员每小时工资
+int ID; 					    //员工的ID标识
+
+
+
+class Person                    //员工类
+{
+protected:                      // private成员是不能被继承的，只有public，protected的成员才可以被继承。
+	// 被保护的成员变量
+	int Number;                     //编号
+	char Name[20];              //姓名
+	int Duty;                   //岗位
+	double Income;              //收入
+	Person *next;				//链表的节点
+public:
+	Person(char ID,char *Name,int Duty)
+	{
+	this->Duty=Duty;
+	strcpy(this->Name,Name);
+	this->Number=ID;
+	}
+	virtual void CalcSalary()=0;// 虚函数作用
+	virtual void Output()=0;    // 通过重写虚拟函数来实现对基类虚拟函数的覆盖
+    virtual void SetAmount(double){}
+	friend class Company;       // 友元类，所有类都可以使用其成员变量
+};
+
+
+
+class Manager:public Person     //经理类
+{
+public:
+	Manager(char ID,char *Name,int Duty):Person(ID,Name,Duty){}
+	void CalcSalary(){Income=Manager_Money;}
+	void Output()
+	{
+		CalcSalary();
+		cout<<Number<<"\t"<<Name<<"\t经理\t"<<Income<<endl;
+	}
+};
+
+
+
+class SalesManager:public Person //销售经理类
+{
+private:
+	double Amount;
+public:
+	SalesManager(char ID,char *Name,int Duty):Person(ID,Name,Duty){}
+	void SetAmount(double s)
+	{
+		Amount=s;
+	}
+	void CalcSalary()
+	{
+		Income=SalesManager_Money+Amount*SalesManager_Add/100;
+	}
+	void Output()
+	{
+		CalcSalary();
+		cout<<Number<<"\t"<<Name<<"\t销售经理\t"<<Income<<endl;
+	}
+};
+
+
+
+class Secretary:public Person  //文秘类
+{
+public:
+	Secretary(char ID,char *Name,int Duty):Person(ID,Name,Duty){}
+	void CalcSalary()
+	{Income=SecretarySalary;}
+	void Output()
+	{
+		CalcSalary();
+		cout<<Number<<"\t"<<Name<<"\t文秘\t"<<Income<<endl;
+   }
+};
+
+
+class Technician:public Person //技术员类
+{
+private:
+	double t;
+public:
+	Technician(char ID,char *Name,int Duty,double T):Person(ID,Name,Duty)
+	{
+		this->t=T;
+	}
+	double GetT()
+	{
+		return t;
+	}
+	void SetT(double T)
+	{
+		this->t=T;
+	}
+	void CalcSalary()
+	{
+		Income=Technicist_Every_Hour*t;
+	}
+	void Output()
+	{
+		CalcSalary();
+		cout<<Number<<"\t"<<Name<<"\t技术员\t"<<t<<"\t"<<Income<<endl;
+	}
+};
+
+
+
+class Sales:public Person //销售员类
+{
+private:
+	double Amount;
+public:
+	Sales(char ID,char *Name,int Duty,double Amount):Person(ID,Name,Duty)
+	{
+		this->Amount=Amount;
+	}
+	double GetAmount()
+	{
+		return Amount;
+	}
+	void SetAmount(double Amount)
+	{
+		this->Amount=Amount;
+	}
+	void CalcSalary()
+	{
+		Income=Sales_Add/100*Amount;
+	}
+	void Output()
+	{
+		CalcSalary();
+		cout<<Number<<"\t"<<Name<<"\t销售员\t"<<Amount<<"\t"<<Income<<endl;
+	}
+};
+class Company //公司类
+{
+private:
+	Person *Worker; //员工表
+	void Clear(); //清除内存中数据
+public:
+		Company()
+		{
+			Worker=0;
+			Load();
+		}
+		~Company()
+		{
+			Person *p;
+			p=Worker;
+			while(p)
+			{
+				p=p->next;
+				delete Worker;
+				Worker=p;
+			}
+			Worker=0;
+		}
+	void Add(); //增加人员
+	void Delete(); //删除人员
+	void DisPlay();	//显示人员信息
+	void Modify(); //修改人员
+	void Query(); //查询人员
+	void Set(); //基础数据设置
+	void Save(); //数据存盘(包括基础数据，人员数据)
+	void Load(); //数据装入(包括基础数据，人员数据)
+	void DelAll(); // 清空人员信息
+};
+
+
+void Company::Clear()   //清除内存中人员数据
+{
+   Person* p=Worker;
+   while(p)
+   {
+	   Worker=p->next;
+	   delete p;
+	   p=Worker;
+   }
+}//
+
+
+
+void password()              //设置密码
+{
+    FILE *fp;
+    char num1[10],num2[10],ch;
+    int i=0;
+    if((fp=fopen("password.bin","r"))==NULL)
+    {
+	loop1://创建密码
+		cout<<setw(40)<<"\n\n\n\n\n\n\n\n\n\n\t\t\t首次使用，请创建密码：";
+		if((fp=fopen("password.bin","w"))==NULL)
+			exit(1);
+		while ((ch=getch())!='\r')
+		{
+			if (i<10 && isprint(ch))
+			{
+				num1[i++]=ch;
+				putchar('*');
+			}
+			else if (i>0 && ch=='\b')
+			{
+				--i;
+				putchar('\b');
+				putchar(' ');
+				putchar('\b');
+			}
+		}
+		num1[i]='\0';
+		cout<<endl;
+		cout<<"\t\t\t请再次确认密码：";
+		i=0;
+		while ((ch=getch())!='\r')
+		{
+			if (i<10 && isprint(ch))
+			{
+				num2[i++]=ch;
+				putchar('*');
+			}
+			else if (i>0 && ch=='\b')
+			{
+				--i;
+				putchar('\b');
+				putchar(' ');
+				putchar('\b');
+			}
+		}
+		num2[i]='\0';
+		if(strcmp(num1,num2)!=0)
+		{
+
+			cout<<"输入错误："<<endl;
+			getch();
+			goto loop1;
+		}
+		fputs(num1,fp);
+		fclose(fp);
+		cout<<endl;
+		cout<<"\t\t\t创建成功！"<<endl;
+		getch();
+    }
+    else
+    {
+	   loop://输入密码
+		cout<<endl;
+		cout<<"输入密码："<<endl;
+		int flag=0;
+		i=0;
+		while ((ch=getch())!='\r')
+		{
+
+			flag=1;
+			if (i<10 && isprint(ch))
+			{
+				num1[i++]=ch;
+				putchar('*');
+			}
+			else if (i>0 && ch=='\b')
+			{
+				--i;
+				putchar('\b');
+				putchar(' ');
+				putchar('\b');
+			}
+
+		}
+		num1[i]='\0';
+		if(flag==0)
+			//gets(num1);
+		goto loop;
+
+		if((fp=fopen("password.bin","r"))==NULL)
+		{
+			cout<<"不能打开！"<<endl;
+			getch();
+			exit(1);
+		}
+		fgets(num2,11,fp);
+		if(strcmp(num1,num2)!=0)
+		 goto loop;
+    }
+
+
+}
+
+void welcome()            //欢迎界面
+{
+    system("color 05e");
+	cout<<"\n\n\n\n\n\n\n\n\n\n\n";
+	cout<<"\t\t\t     欢迎进入企业管理系统"<<endl;
+	Sleep(1000);
+	system("cls");
+}
+
+void Company::DelAll() //清除内存中人员数据(内部使用)
+{
+
+	Person* p=Worker;
+
+	while(p)
+	{
+		Worker=p->next;
+		delete p;
+		p=Worker;
+	}
+}
+
+void Company::Add()
+{
+	Person *p; //新结点指针
+	int Duty;
+	char Name[20];
+	double Amount,T;
+	cout<<"\t\t\t\n** 新增员工 **\n";
+	//输入员工信息
+	ID++;
+		cout<<"请选择新增的岗位"
+		<<"\n\t\t1-经理"
+		<<"\n\t\t2-销售经理"
+		<<"\n\t\t3-销售员"
+		<<"\n\t\t4-技术员"
+		<<"\n\t\t5-文秘"
+		<<"\n\t\t0-返回上一级\n";
+		cout<<"请输入选项：";
+	cin>>Duty;
+
+	if(Duty==3)
+	{
+		cout<<"本月销售额:"; cin>>Amount;
+	}
+	else if(Duty==4)
+	{
+		cout<<"本月完成代码量（1000元/每千行代码）:";
+		cin>>T;
+	}
+	else if(Duty == 0)return;
+	cout<<"输入姓名:";
+	cin>>Name;
+	//创建新员工结点
+	switch(Duty)
+	{
+		case 1:p=new Manager(ID,Name,Duty); break;
+		case 2:p=new SalesManager(ID,Name,Duty); break;
+		case 3:p=new Sales(ID,Name,Duty,Amount); break;
+		case 4:p=new Technician(ID,Name,Duty,T); break;
+        case 5:p=new Secretary(ID,Name,Duty); break;
+	}
+	p->next=0;
+	//员工结点加入链表
+	if(Worker) //若已经存在结点
+	{
+		Person *p2;
+		p2=Worker;
+		while(p2->next) //查找尾结点
+		{
+			p2=p2->next;
+		}
+		p2->next=p; //连接
+	}
+	else //若不存在结点(表空)
+	{
+		Worker=p; //连接
+	}
+   Save();
+   Load();
+
+}
+
+void Company::Delete() //删除人员
+{
+
+	int Number;
+	cout<<"\n** 删除员工 **\n";
+	cout<<"ID:"; cin>>Number;
+	//查找要删除的结点
+	Person *p1,*p2; p1=Worker;
+	while(p1)
+	{
+		if(p1->Number==Number)  break;
+		else
+		{
+		p2=p1;
+		p1=p1->next;
+		}
+	}
+
+	//删除结点
+
+	if(p1!=NULL)//若找到结点，则删除
+	{
+		if(p1==Worker) //若要删除的结点是第一个结点
+		{
+			Worker=p1->next;
+			delete p1;
+		}
+		else //若要删除的结点是后续结点
+		{
+			p2->next=p1->next;
+			delete p1;
+		}
+		cout<<"找到并删除\n";
+	}
+	else //未找到结点
+	cout<<"未找到!\n";
+}
+
+void Company::Modify()
+{
+	int Number,Duty;
+	char Name[20];
+	double Amount,T;
+	cout<<"\n** 修改员工 **\n";
+	cout<<"ID:";
+	cin.get();
+    cin>>Number;
+	//查找要修改的结点
+	Person *p1,*p2; p1=Worker;
+	while(p1)
+	{
+		if(p1->Number==Number)
+		break;
+		else
+		{
+		p2=p1;
+		p1=p1->next;
+		}
+	}
+	//修改结点
+	if(p1!=NULL)//若找到结点
+	{
+		p1->Output();
+		cout<<"请选择需要修改的岗位"
+		<<"\n\t\t1-经理"
+		<<"\n\t\t2-销售经理"
+		<<"\n\t\t3-销售员"
+		<<"\n\t\t4-技术员"
+		<<"\n\t\t5-文秘"
+		<<"\n\t\t0-返回上一级\n";
+		cout<<"请输入选项：";
+        cin>>Duty;
+		if(p1->Duty!=Duty) //若岗位发生变动
+		{
+		//修改其它数据
+
+		if(Duty==3)
+		{
+			cout<<"本月销售额:"; cin>>Amount;
+		}
+		else if(Duty==4)
+		{
+			cout<<"本月完成代码量（1000元/每千行代码）:";
+			cin>>T;
+		}
+		else if(Duty==0)return;
+		cout<<"输入姓名:";
+		cin>>Name;
+		//创建新员工结点
+		Person *p3;
+		switch(Duty)
+		{
+			case 1:p3=new Manager(p1->Number,Name,Duty); break;
+			case 2:p3=new SalesManager(p1->Number,Name,Duty); break;
+			case 3:p3=new Sales(p1->Number,Name,Duty,Amount); break;
+			case 4:p3=new Technician(p1->Number,Name,Duty,T); break;
+		}
+		//员工结点替换到链表
+		p3->next=p1->next;
+		if(p1==Worker) //若要替换的结点是第一个结点
+			Worker=p3;
+			else //若要删除的结点是后续结点
+			p2->next=p3;
+			//删除原来的员工结点
+			delete p1;
+		}
+		else //若岗位没有变动
+		{
+
+			cout<<"输入姓名:"; cin>>p1->Name;
+			if(Duty==3)
+			{
+				cout<<"本月销售额:";cin>>Amount; ((Sales *)p1)->SetAmount(Amount);
+			}
+			else if(Duty==4)
+			{
+
+				cout<<"本月完成代码量（1000元/每千行代码）:";
+				cin>>T;
+				((Technician *)p1)->SetT(T);
+			}
+		}
+		cout<<"修改成功!\n";
+	}
+	else //未找到结点
+	cout<<"未找到!\n";
+	cin.get();
+	cin.get();
+
+}
+
+void Company::Query()
+{
+	cout<<"\n** 查询人员本月销售信息 **\n";
+	cout<<"ID\t姓名\t职位\t工资\n";
+	double sum=0; //销售额总和
+	Person *p=Worker;
+	while(p)
+	{
+		if(p->Duty==3)sum+=((Sales *)p)->GetAmount();
+		p=p->next;
+	}
+		p=Worker;
+		double sum2=0; //工资总和
+	while(p)
+	{
+		if(p->Duty==2)
+		((SalesManager *)p)->SetAmount(sum);
+		p->Output();
+		sum2+=p->Income;
+		p=p->next;
+	}
+	cout<<"本月盈利:"<<sum*0.10-sum2<<endl;
+	cout<<"(按照10％利润计算)\n";
+}
+
+void Company::Set()
+{
+	cout<<"\n** 设置基础数据 **\n";
+	cout<<"经理固定月薪["<<Manager_Money<<"元]:";
+	cin>>Manager_Money;
+    cout<<"文秘固定月薪["<<SecretarySalary<<"元]:";
+    cin>>SecretarySalary;
+	cout<<"销售经理固定月薪["<<SalesManager_Money<<"元]:";
+	cin>>SalesManager_Money;
+	cout<<"销售经理提成["<<SalesManager_Add<<"％]:";
+	cin>>SalesManager_Add;
+	cout<<"销售人员提成["<<Sales_Add<<"％]:";
+	cin>>Sales_Add;
+	cout<<"技术人员每千行代码工资["<<Technicist_Every_Hour<<"（1000元/每千行代码）]:";
+	cin>>Technicist_Every_Hour;
+	cout<<"员工标识[>="<<ID<<"]:";
+	cin>>ID;
+}
+
+void Company::DisPlay()   //数据装入(包括基础数据，人员数据)
+{
+   int d;
+   Person *p3;
+   p3=Worker;
+   system("cls");
+   if(p3!=NULL)
+   {
+	   cout<<"工号"<<"\t"<<"姓名"<<"\t"<<"职位"<<"\t\t"<<"销售额"<<"\t\t"<<"技术人员每千行代码工资"<<endl<<endl;
+
+	   while(p3!=NULL)
+	   {
+		   d=p3->Duty;
+		   if(d==1)
+		   {
+			   cout<<p3->Number<<"\t"<<p3->Name<<"\t"<<"经理"<<endl;
+		   }
+		   if(d==2)
+		   {
+			   cout<<p3->Number<<"\t"<<p3->Name<<"\t"<<"业务经理"<<endl;
+		   }
+		   if(d==3)
+		   {
+			   cout<<p3->Number<<"\t"<<p3->Name<<"\t"<<"销售人员"<<"\t";
+			   Sales* s = (Sales*)p3;//runtime type information->RTTI
+			   cout<<s->GetAmount()<<endl;
+		   }
+		   if(d==4)
+		   {
+			   cout<<p3->Number<<"\t"<<p3->Name<<"\t"<<"技术人员"<<"\t\t\t";
+			   Technician *t=(Technician *)p3;
+			   cout<<t->GetT()<<endl;
+		   }
+		   if(d==5)
+		   {
+			   cout<<p3->Number<<"\t"<<p3->Name<<"\t"<<"秘书"<<endl;
+		   }
+		   p3=p3->next;
+	   }
+
+	   cout<<"显示完成！"<<endl;
+   }
+   else cout<<"人员信息为空，请先添加！"<<endl;
+   getch();
+}
+
+
+void Company::Save() //数据存盘(包括基础数据，人员数据),均采用文本文件
+
+{
+
+		ofstream fPerson,fBase;
+
+		char c;
+
+		cout<<"\n保存人员和基础数据,是否继续?[Y/N]:"; cin>>c;
+
+		if(toupper(c)!='Y')return;
+
+		//保存人员编号、姓名、岗位
+
+		fPerson.open("person.txt",ios::out);
+
+		Person *p=Worker;
+
+		while(p)
+		{
+			fPerson<<p->Number<<"\t"<<p->Name<<"\t"<<p->Duty<<"\t";
+			if(p->Duty==3)
+			fPerson<<((Sales*)p)->GetAmount()<<"\t";
+			else if(p->Duty==4)
+			fPerson<<((Technician *)p)->GetT()<<"\t";
+			fPerson<<endl;
+			p=p->next;
+		}
+		fPerson.close();
+		//保存基础数据
+		fBase.open("base.txt",ios::out);
+		fBase<<"经理固定月薪\t"<<Manager_Money<<endl;
+        fBase<<"文秘固定月薪\t"<<SecretarySalary<<endl;
+		fBase<<"销售经理固定月薪\t"<<SalesManager_Money<<endl;
+		fBase<<"销售经理提成％\t"<<SalesManager_Add<<endl;
+		fBase<<"销售人员提成％\t"<<Sales_Add<<endl;
+		fBase<<"技术人员小时工资\t"<<Technicist_Every_Hour<<endl;
+		fBase<<"ID\t"<<ID<<endl;
+		fPerson.close();
+		cout<<"\n保存人员和基础数据已经完成...\n";
+}
+
+void Company::Load() //数据装入(包括基础数据，人员数据)
+{
+	//基础数据装入
+	ifstream fBase;
+	char buf[80]; //buf用于保存数据文件中的注释字符串
+	fBase.open("base.txt",ios::in);
+	fBase>>buf>>Manager_Money; //经理固定月薪
+    fBase>>buf>>SecretarySalary;      //文秘固定月薪
+	fBase>>buf>>SalesManager_Money; //销售经理固定月薪
+	fBase>>buf>>SalesManager_Add; //销售经理提成％
+	fBase>>buf>>Sales_Add; //销售人员提成％
+	fBase>>buf>>Technicist_Every_Hour; //技术人员小时工资
+	fBase>>buf>>ID; //员工标识
+	fBase.close();
+	//清除内存人员数据
+	Clear();
+	//人员数据数据装入
+	ifstream fPerson;
+	Person *p=Worker;
+	int Number;
+	char Name[20];
+	int Duty;
+	double Amount,T;
+	fPerson.open("person.txt",ios::in);
+	//读一条记录
+	fPerson>>Number>>Name>>Duty;
+	if(Duty==3)fPerson>>Amount;
+	else if(Duty==4)
+	fPerson>>T;
+	while(fPerson.good())
+	{
+		//创建员工结点
+		switch(Duty)
+		{
+		case 1:p=new Manager(Number,Name,Duty); break;
+		case 2:p=new SalesManager(Number,Name,Duty); break;
+		case 3:p=new Sales(Number,Name,Duty,Amount); break;
+		case 4:p=new Technician(Number,Name,Duty,T); break;
+        case 5:p=new Secretary(ID,Name,Duty);       break;
+		}
+		p->next=0;
+		//员工结点加入链表
+		if(Worker) //若已经存在结点
+		{
+			Person *p2;
+			p2=Worker;
+			while(p2->next) //查找尾结点
+			{
+				p2=p2->next;
+
+			}
+				p2->next=p; //连接
+		}
+		else //若不存在结点(表空)
+		{
+			Worker=p; //连接
+		}
+		//读下一条记录
+		fPerson>>Number>>Name>>Duty;
+		if(Duty==3)
+		fPerson>>Amount;
+		else if(Duty==4)
+		fPerson>>T;
+	}
+	fPerson.close();
+	cout<<"\n人员和基础数据已经装入...\n";
+
+}
+int main()
+{
+    welcome();
+    password();
+	char Select;
+
+	Company A;
+    int c;
+    do
+    {
+
+	system("color 02e");
+    cout<<"********************************************************************************"<<endl;
+    cout<<"〓〓〓〓〓〓〓〓〓〓  ☆    公 司 人 事 管 理 系 统     ☆  〓〓〓〓〓〓〓〓〓〓"<<endl;
+    cout<<"〓〓〓〓〓〓〓★★★★★         ★★★★★★★         ★★★★★〓〓〓〓〓〓〓"<<endl;
+    cout<<"〓〓〓〓〓〓〓〓〓★  ☆          1.增加人员信息        ☆  ★〓〓〓〓〓〓〓〓〓"<<endl;
+    cout<<"〓〓〓〓〓〓〓〓〓★  ☆          2.删除人员信息        ☆  ★〓〓〓〓〓〓〓〓〓"<<endl;
+    cout<<"〓〓〓〓〓〓〓〓〓★  ☆          3.修改人员信息        ☆  ★〓〓〓〓〓〓〓〓〓"<<endl;
+    cout<<"〓〓〓〓〓〓〓〓〓★  ☆          4.查询人员信息        ☆  ★〓〓〓〓〓〓〓〓〓"<<endl;
+    cout<<"〓〓〓〓〓〓〓〓〓★  ☆          5.员工数据设置        ☆  ★〓〓〓〓〓〓〓〓〓"<<endl;
+    cout<<"〓〓〓〓〓〓〓〓〓★  ☆          6.员工数据存盘        ☆  ★〓〓〓〓〓〓〓〓〓"<<endl;
+    cout<<"〓〓〓〓〓〓〓〓〓★  ☆          7.员工数据装入        ☆  ★〓〓〓〓〓〓〓〓〓"<<endl;
+    cout<<"〓〓〓〓〓〓〓〓〓★  ☆          8.员工信息清空        ☆  ★〓〓〓〓〓〓〓〓〓"<<endl;
+    cout<<"〓〓〓〓〓〓〓〓〓★  ☆          9.员工信息显示        ☆  ★〓〓〓〓〓〓〓〓〓"<<endl;
+    cout<<"〓〓〓〓〓〓〓〓〓★  ☆          0.安全退出系统        ☆  ★〓〓〓〓〓〓〓〓〓"<<endl;
+
+	cout << "请输入编号【0~9】：";
+	cin>>Select;
+	system("cls");
+	switch(Select)
+	{
+		case '1': A.Add(); break;
+		case '2': A.Delete();break;
+		case '3': A.Modify();break;
+		case '4': A.Query();cin.get();cin.get(); break;
+		case '5': A.Set(); break;
+		case '6': A.Save(); break;
+		case '7': A.Load(); break;
+        case '8': A.DelAll();break;
+        case '9': A.DisPlay();break;
+        case '0': exit(0);
+	}
+    }
+	while(c!='0');
+	return 0;
+}
